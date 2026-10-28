@@ -1,0 +1,40 @@
+## .NET build output
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+*.nupkg
+*.snupkg
+
+## Test results
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+
+## User-specific files (Visual Studio, Rider, VS Code)
+.vs/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.rsuser
+*.sln.docstates
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+## Local settings and secrets (secrets belong in dotnet user-secrets, never in the repo)
+appsettings.Local.json
+appsettings.*.Local.json
+*.env
+.env.*
+
+## OS files
+.DS_Store
+Thumbs.db

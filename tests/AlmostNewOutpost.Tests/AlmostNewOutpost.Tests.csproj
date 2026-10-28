@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AlmostNewOutpost.Tests</RootNamespace>
+    <!-- xUnit v3 test projects are small console apps. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- Holds OUTPOST_TEST_ADMIN_CONNECTION (the MySQL root connection used to build the test database).
+         Keep this id in sync with TestDatabase.UserSecretsId. -->
+    <UserSecretsId>almost-new-outpost-tests-8d41a7c2</UserSecretsId>
+    <!-- xUnit1051 asks every async call in a test to pass TestContext.Current.CancellationToken.
+         That clutters code meant for students, so it is switched off. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AlmostNewOutpost.Api\AlmostNewOutpost.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- The SQL script is copied next to the tests: the seed-hash test reads it, and the
+       API tests use it to build almost_new_outpost_test. -->
+  <ItemGroup>
+    <None Include="..\..\database\almost_new_outpost.sql" Link="database\almost_new_outpost.sql" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
