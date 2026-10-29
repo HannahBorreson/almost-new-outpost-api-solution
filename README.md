@@ -171,6 +171,10 @@ The procedures report broken rules with `SIGNAL` errors. `DatabaseErrors` lists 
 | 50006 | invalid price | 500 (would be an API bug) |
 | 50010 / 50011 | bad sort value | 400 |
 
+### Archived users
+
+A user is archived by setting `Users.ArchivedAtUtc` to the UTC time it happened; `NULL` means the account is active, and setting it back to `NULL` restores it. `sp_GetUserByUsername` and `sp_GetUserById` skip archived users, so an archived user gets the same 401 "Invalid username or password." as an unknown user, and `GET /api/auth/me` returns 401 for them. Their row and their purchases stay in the database, so purchase history is never lost. A token issued before the user was archived keeps working on other routes until it expires (at most 60 minutes), because only login and `/api/auth/me` check whether the user is archived.
+
 ### Security notes worth discussing in class
 
 - **Identity always comes from the token's `sub` claim**, never from the URL or body. Extra fields like `"finalPrice": 1` or `"userId": 1` on a purchase are ignored.
