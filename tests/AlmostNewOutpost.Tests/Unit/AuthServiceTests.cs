@@ -1,27 +1,36 @@
 using AlmostNewOutpost.Api.Models.Requests;
 using AlmostNewOutpost.Api.Models.Responses;
 using AlmostNewOutpost.Api.Models.Rows;
+using AlmostNewOutpost.Api.Repositories;
 using AlmostNewOutpost.Api.Services;
 using Microsoft.AspNetCore.Identity;
+using NSubstitute;
 
 namespace AlmostNewOutpost.Tests.Unit;
 
 /// <summary>
-/// Login rules, tested with a fake user repository instead of the database.
+/// Login rules, tested with an NSubstitute user repository instead of the database.
 /// </summary>
 public class AuthServiceTests
 {
-    private readonly FakeUserRepository _users = new FakeUserRepository();
-    private readonly CountingPasswordHasher _hasher = new CountingPasswordHasher();
+    private readonly IUserRepository _users = Substitute.For<IUserRepository>();
+    private readonly PasswordHasher<UserRow> _hasher;
     private readonly AuthService _service;
     private readonly string _medicHash;
 
     public AuthServiceTests()
     {
+        // A partial substitute: the real hashing still runs, but NSubstitute records every call.
+        // ForPartsOf can't fill in optional constructor arguments, so the default options are passed in.
+        _hasher = Substitute.ForPartsOf<PasswordHasher<UserRow>>(TestSettings.Wrap(new PasswordHasherOptions()));
+
         UserRow medic = new UserRow { UserId = 3, Username = "medic", RoleId = 3, RoleName = "Medic" };
         _medicHash = new PasswordHasher<UserRow>().HashPassword(medic, "medic123");
         medic.PasswordHash = _medicHash;
-        _users.Add(medic);
+
+        // Any username finds nobody, except "medic".
+        _users.GetByUsernameAsync(Arg.Any<string>()).Returns((UserRow?)null);
+        _users.GetByUsernameAsync("medic").Returns(medic);
 
         TokenService tokens = new TokenService(TestSettings.Wrap(TestSettings.Jwt()), TimeProvider.System);
         _service = new AuthService(_users, _hasher, tokens);
@@ -30,8 +39,13 @@ public class AuthServiceTests
     [Fact]
     public async Task CorrectPassword_ReturnsTokenAndUser()
     {
-        LoginResponse? response = await _service.LoginAsync(new LoginRequest { Username = "medic", Password = "medic123" });
+        // Arrange
+        LoginRequest request = new LoginRequest { Username = "medic", Password = "medic123" };
 
+        // Act
+        LoginResponse? response = await _service.LoginAsync(request);
+
+        // Assert
         Assert.NotNull(response);
         Assert.False(string.IsNullOrEmpty(response.AccessToken));
         Assert.Equal(3, response.User.Id);
@@ -42,28 +56,47 @@ public class AuthServiceTests
     [Fact]
     public async Task UsernameWithSpaces_IsTrimmed()
     {
-        LoginResponse? response = await _service.LoginAsync(new LoginRequest { Username = "  medic ", Password = "medic123" });
+        // Arrange
+        LoginRequest request = new LoginRequest { Username = "  medic ", Password = "medic123" };
 
+        // Act
+        LoginResponse? response = await _service.LoginAsync(request);
+
+        // Assert
         Assert.NotNull(response);
     }
 
     [Fact]
     public async Task WrongPassword_Fails()
     {
-        LoginResponse? response = await _service.LoginAsync(new LoginRequest { Username = "medic", Password = "wrong" });
+        // Arrange
+        LoginRequest request = new LoginRequest { Username = "medic", Password = "wrong" };
 
+        // Act
+        LoginResponse? response = await _service.LoginAsync(request);
+
+        // Assert
         Assert.Null(response);
     }
 
     [Fact]
     public async Task UnknownUser_Fails_AndStillVerifiesTheDummyHash()
     {
-        LoginResponse? response = await _service.LoginAsync(new LoginRequest { Username = "nobody", Password = "medic123" });
+        // Arrange
+        LoginRequest request = new LoginRequest { Username = "nobody", Password = "medic123" };
 
+        // Act
+        LoginResponse? response = await _service.LoginAsync(request);
+
+        // Assert
         Assert.Null(response);
-        string verified = Assert.Single(_hasher.VerifiedHashes);
-        Assert.NotEqual(_medicHash, verified);
-        Assert.StartsWith("AQAAAAIAAYag", verified); // a real v3, 100,000-iteration hash
+        // Exactly one hash was verified...
+        _hasher.Received(1).VerifyHashedPassword(Arg.Any<UserRow>(), Arg.Any<string>(), Arg.Any<string>());
+        // ...and it was a real v3, 100,000-iteration hash that is not the medic's.
+        _hasher.Received(1).VerifyHashedPassword(
+            Arg.Any<UserRow>(),
+            Arg.Is<string>(hash => hash != _medicHash && hash.StartsWith("AQAAAAIAAYag", StringComparison.Ordinal)),
+            Arg.Any<string>());
     }
 
     [Theory]
@@ -72,8 +105,13 @@ public class AuthServiceTests
     [InlineData("medic", "")]
     public async Task BlankInput_Fails(string username, string password)
     {
-        LoginResponse? response = await _service.LoginAsync(new LoginRequest { Username = username, Password = password });
+        // Arrange
+        LoginRequest request = new LoginRequest { Username = username, Password = password };
 
+        // Act
+        LoginResponse? response = await _service.LoginAsync(request);
+
+        // Assert
         Assert.Null(response);
     }
 }

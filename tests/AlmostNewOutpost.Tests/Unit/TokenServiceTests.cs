@@ -1,5 +1,6 @@
 using System.Text;
 using AlmostNewOutpost.Api.Services;
+using Microsoft.Extensions.Time.Testing;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
@@ -18,11 +19,14 @@ public class TokenServiceTests
     [Fact]
     public void Token_ContainsTheExpectedClaims()
     {
+        // Arrange
         TokenService service = CreateService(TimeProvider.System);
 
+        // Act
         AccessToken token = service.CreateToken(3, "medic", "Medic");
         JsonWebToken jwt = new JsonWebToken(token.Token);
 
+        // Assert
         Assert.Equal("3", jwt.GetClaim("sub").Value);
         Assert.Equal("medic", jwt.GetClaim("unique_name").Value);
         Assert.Equal("Medic", jwt.GetClaim("role").Value);
@@ -34,13 +38,16 @@ public class TokenServiceTests
     [Fact]
     public void Token_ExpiresAfter60Minutes()
     {
+        // Arrange
         DateTimeOffset now = new DateTimeOffset(2026, 10, 27, 21, 0, 0, TimeSpan.Zero);
-        TokenService service = CreateService(new FixedTimeProvider(now));
+        TokenService service = CreateService(new FakeTimeProvider(now));
+        DateTime expected = now.UtcDateTime.AddMinutes(60);
 
+        // Act
         AccessToken token = service.CreateToken(3, "medic", "Medic");
         JsonWebToken jwt = new JsonWebToken(token.Token);
 
-        DateTime expected = now.UtcDateTime.AddMinutes(60);
+        // Assert
         Assert.Equal(expected, token.ExpiresAtUtc);
         Assert.Equal(expected, jwt.ValidTo);
         Assert.Equal(DateTimeKind.Utc, token.ExpiresAtUtc.Kind);
@@ -49,23 +56,29 @@ public class TokenServiceTests
     [Fact]
     public async Task Token_ValidatesWithTheConfiguredParameters()
     {
+        // Arrange
         TokenService service = CreateService(TimeProvider.System);
         AccessToken token = service.CreateToken(5, "admin", "MerchantAdmin");
 
+        // Act
         TokenValidationResult result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Token, ValidationParameters(TestSettings.SigningKey));
 
+        // Assert
         Assert.True(result.IsValid);
     }
 
     [Fact]
     public async Task Token_SignedWithAnotherKey_DoesNotValidate()
     {
+        // Arrange
         TokenService service = CreateService(TimeProvider.System);
         AccessToken token = service.CreateToken(5, "admin", "MerchantAdmin");
-
         string otherKey = new string('x', 64);
+
+        // Act
         TokenValidationResult result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Token, ValidationParameters(otherKey));
 
+        // Assert
         Assert.False(result.IsValid);
     }
 
