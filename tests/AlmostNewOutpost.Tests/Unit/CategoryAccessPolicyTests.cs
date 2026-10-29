@@ -30,7 +30,11 @@ public class CategoryAccessPolicyTests
     [InlineData("MerchantAdmin", "Security", true)]
     public void CanBuy_FollowsTheMatrix(string role, string category, bool expected)
     {
-        Assert.Equal(expected, CategoryAccessPolicy.CanBuy(role, category));
+        // Act
+        bool canBuy = CategoryAccessPolicy.CanBuy(role, category);
+
+        // Assert
+        Assert.Equal(expected, canBuy);
     }
 
     [Theory]
@@ -39,7 +43,11 @@ public class CategoryAccessPolicyTests
     [InlineData(null)]
     public void UnknownRole_CannotBuyAnything(string? role)
     {
-        Assert.False(CategoryAccessPolicy.CanBuy(role, "Basic"));
+        // Act
+        bool canBuy = CategoryAccessPolicy.CanBuy(role, "Basic");
+
+        // Assert
+        Assert.False(canBuy);
     }
 
     [Theory]
@@ -48,6 +56,10 @@ public class CategoryAccessPolicyTests
     [InlineData(null)]
     public void UnknownCategory_CannotBeBought(string? category)
     {
-        Assert.False(CategoryAccessPolicy.CanBuy("MerchantAdmin", category));
+        // Act
+        bool canBuy = CategoryAccessPolicy.CanBuy("MerchantAdmin", category);
+
+        // Assert
+        Assert.False(canBuy);
     }
 }
