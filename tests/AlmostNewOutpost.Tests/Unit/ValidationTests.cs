@@ -29,13 +29,18 @@ public class ValidationTests
     [InlineData(50, 128)]
     public void Login_ValidLengths_Pass(int usernameLength, int passwordLength)
     {
+        // Arrange
         LoginRequest request = new LoginRequest
         {
             Username = new string('u', usernameLength),
             Password = new string('p', passwordLength),
         };
 
-        Assert.Empty(Validate(request));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -44,17 +49,26 @@ public class ValidationTests
     [InlineData("medic", "", "Password")]
     public void Login_BlankFields_Fail(string username, string password, string failingField)
     {
+        // Arrange
         LoginRequest request = new LoginRequest { Username = username, Password = password };
 
-        Assert.True(HasErrorFor(Validate(request), failingField));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, failingField));
     }
 
     [Fact]
     public void Login_TooLong_Fails()
     {
+        // Arrange
         LoginRequest request = new LoginRequest { Username = new string('u', 51), Password = new string('p', 129) };
+
+        // Act
         List<ValidationResult> results = Validate(request);
 
+        // Assert
         Assert.True(HasErrorFor(results, "Username"));
         Assert.True(HasErrorFor(results, "Password"));
     }
@@ -64,7 +78,14 @@ public class ValidationTests
     [Fact]
     public void Purchase_ProductIdOne_Passes()
     {
-        Assert.Empty(Validate(new CreatePurchaseRequest { ProductId = 1 }));
+        // Arrange
+        CreatePurchaseRequest request = new CreatePurchaseRequest { ProductId = 1 };
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -73,7 +94,14 @@ public class ValidationTests
     [InlineData(-5)]
     public void Purchase_MissingOrTooSmallProductId_Fails(int? productId)
     {
-        Assert.True(HasErrorFor(Validate(new CreatePurchaseRequest { ProductId = productId }), "ProductId"));
+        // Arrange
+        CreatePurchaseRequest request = new CreatePurchaseRequest { ProductId = productId };
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "ProductId"));
     }
 
     // ---- ProductUpsertRequest ----
@@ -93,7 +121,14 @@ public class ValidationTests
     [Fact]
     public void Product_ValidRequest_Passes()
     {
-        Assert.Empty(Validate(ValidProduct()));
+        // Arrange
+        ProductUpsertRequest request = ValidProduct();
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -101,10 +136,15 @@ public class ValidationTests
     [InlineData(100000)]
     public void Product_PriceOnTheBoundary_Passes(int price)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.PriceCredits = price;
 
-        Assert.Empty(Validate(request));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -113,10 +153,15 @@ public class ValidationTests
     [InlineData(100001)]
     public void Product_PriceOutOfRange_Fails(int? price)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.PriceCredits = price;
 
-        Assert.True(HasErrorFor(Validate(request), "PriceCredits"));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "PriceCredits"));
     }
 
     [Theory]
@@ -124,10 +169,15 @@ public class ValidationTests
     [InlineData("  ab  ")]
     public void Product_NameOfTwoCharactersAfterTrimming_Passes(string name)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.Name = name;
 
-        Assert.Empty(Validate(request));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -136,34 +186,51 @@ public class ValidationTests
     [InlineData("  a  ")]
     public void Product_NameTooShort_Fails(string name)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.Name = name;
 
-        Assert.True(HasErrorFor(Validate(request), "Name"));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "Name"));
     }
 
     [Fact]
     public void Product_NameOf100Characters_Passes_And101_Fails()
     {
+        // Arrange
         ProductUpsertRequest ok = ValidProduct();
         ok.Name = new string('n', 100);
         ProductUpsertRequest tooLong = ValidProduct();
         tooLong.Name = new string('n', 101);
 
-        Assert.Empty(Validate(ok));
-        Assert.True(HasErrorFor(Validate(tooLong), "Name"));
+        // Act
+        List<ValidationResult> okResults = Validate(ok);
+        List<ValidationResult> tooLongResults = Validate(tooLong);
+
+        // Assert
+        Assert.Empty(okResults);
+        Assert.True(HasErrorFor(tooLongResults, "Name"));
     }
 
     [Fact]
     public void Product_DescriptionOf500Characters_Passes_And501_Fails()
     {
+        // Arrange
         ProductUpsertRequest ok = ValidProduct();
         ok.Description = new string('d', 500);
         ProductUpsertRequest tooLong = ValidProduct();
         tooLong.Description = new string('d', 501);
 
-        Assert.Empty(Validate(ok));
-        Assert.True(HasErrorFor(Validate(tooLong), "Description"));
+        // Act
+        List<ValidationResult> okResults = Validate(ok);
+        List<ValidationResult> tooLongResults = Validate(tooLong);
+
+        // Assert
+        Assert.Empty(okResults);
+        Assert.True(HasErrorFor(tooLongResults, "Description"));
     }
 
     [Theory]
@@ -171,10 +238,15 @@ public class ValidationTests
     [InlineData(0)]
     public void Product_MissingCategory_Fails(int? categoryId)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.CategoryId = categoryId;
 
-        Assert.True(HasErrorFor(Validate(request), "CategoryId"));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "CategoryId"));
     }
 
     [Theory]
@@ -184,10 +256,15 @@ public class ValidationTests
     [InlineData("Icon2")]
     public void Product_IconKey_AllowedValues_Pass(string? iconKey)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.IconKey = iconKey;
 
-        Assert.Empty(Validate(request));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Theory]
@@ -196,19 +273,29 @@ public class ValidationTests
     [InlineData("<script>")]
     public void Product_IconKey_WithOtherCharacters_Fails(string iconKey)
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.IconKey = iconKey;
 
-        Assert.True(HasErrorFor(Validate(request), "IconKey"));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "IconKey"));
     }
 
     [Fact]
     public void Product_IconKeyOf51Characters_Fails()
     {
+        // Arrange
         ProductUpsertRequest request = ValidProduct();
         request.IconKey = new string('k', 51);
 
-        Assert.True(HasErrorFor(Validate(request), "IconKey"));
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "IconKey"));
     }
 
     // ---- ProductSearchQuery ----
@@ -219,16 +306,30 @@ public class ValidationTests
     [InlineData("kit", "PRICE", "DESC")]
     public void Search_ValidValues_Pass(string? search, string? sortBy, string? sortDir)
     {
+        // Arrange
         ProductSearchQuery query = new ProductSearchQuery { Search = search, SortBy = sortBy, SortDir = sortDir };
 
-        Assert.Empty(Validate(query));
+        // Act
+        List<ValidationResult> results = Validate(query);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Fact]
     public void Search_Of50Characters_Passes_And51_Fails()
     {
-        Assert.Empty(Validate(new ProductSearchQuery { Search = new string('s', 50) }));
-        Assert.True(HasErrorFor(Validate(new ProductSearchQuery { Search = new string('s', 51) }), "Search"));
+        // Arrange
+        ProductSearchQuery ok = new ProductSearchQuery { Search = new string('s', 50) };
+        ProductSearchQuery tooLong = new ProductSearchQuery { Search = new string('s', 51) };
+
+        // Act
+        List<ValidationResult> okResults = Validate(ok);
+        List<ValidationResult> tooLongResults = Validate(tooLong);
+
+        // Assert
+        Assert.Empty(okResults);
+        Assert.True(HasErrorFor(tooLongResults, "Search"));
     }
 
     [Theory]
@@ -236,9 +337,14 @@ public class ValidationTests
     [InlineData("name", "up", "SortDir")]
     public void Search_UnknownSortValues_Fail(string sortBy, string sortDir, string failingField)
     {
+        // Arrange
         ProductSearchQuery query = new ProductSearchQuery { SortBy = sortBy, SortDir = sortDir };
 
-        Assert.True(HasErrorFor(Validate(query), failingField));
+        // Act
+        List<ValidationResult> results = Validate(query);
+
+        // Assert
+        Assert.True(HasErrorFor(results, failingField));
     }
 
     // ---- WeatherOverrideRequest ----
@@ -246,18 +352,39 @@ public class ValidationTests
     [Fact]
     public void WeatherOverride_KnownCondition_Passes()
     {
-        Assert.Empty(Validate(new WeatherOverrideRequest { Condition = WeatherCondition.DustStorm }));
+        // Arrange
+        WeatherOverrideRequest request = new WeatherOverrideRequest { Condition = WeatherCondition.DustStorm };
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.Empty(results);
     }
 
     [Fact]
     public void WeatherOverride_MissingCondition_Fails()
     {
-        Assert.True(HasErrorFor(Validate(new WeatherOverrideRequest { Condition = null }), "Condition"));
+        // Arrange
+        WeatherOverrideRequest request = new WeatherOverrideRequest { Condition = null };
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "Condition"));
     }
 
     [Fact]
     public void WeatherOverride_UndefinedConditionNumber_Fails()
     {
-        Assert.True(HasErrorFor(Validate(new WeatherOverrideRequest { Condition = (WeatherCondition)99 }), "Condition"));
+        // Arrange
+        WeatherOverrideRequest request = new WeatherOverrideRequest { Condition = (WeatherCondition)99 };
+
+        // Act
+        List<ValidationResult> results = Validate(request);
+
+        // Assert
+        Assert.True(HasErrorFor(results, "Condition"));
     }
 }

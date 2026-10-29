@@ -16,8 +16,10 @@ public class PricingServiceTests
     [InlineData(2, 3)]   // 2.5 rounds up
     public void DustStorm_RaisesPriceBy25Percent(int basePrice, int expected)
     {
+        // Act
         int price = PricingService.GetCurrentPrice(basePrice, WeatherCondition.DustStorm);
 
+        // Assert
         Assert.Equal(expected, price);
     }
 
@@ -27,9 +29,15 @@ public class PricingServiceTests
     [InlineData(WeatherCondition.RadiationEvent)]
     public void EveryDangerousCondition_MultipliesThePrice(WeatherCondition condition)
     {
-        Assert.True(PricingService.IsDangerous(condition));
-        Assert.Equal(125, PricingService.GetCurrentPrice(100, condition));
-        Assert.Equal(1.25m, PricingService.GetMultiplier(condition));
+        // Act
+        bool isDangerous = PricingService.IsDangerous(condition);
+        int price = PricingService.GetCurrentPrice(100, condition);
+        decimal multiplier = PricingService.GetMultiplier(condition);
+
+        // Assert
+        Assert.True(isDangerous);
+        Assert.Equal(125, price);
+        Assert.Equal(1.25m, multiplier);
     }
 
     [Theory]
@@ -39,8 +47,14 @@ public class PricingServiceTests
     [InlineData(100000)]
     public void Clear_LeavesThePriceUnchanged(int basePrice)
     {
-        Assert.False(PricingService.IsDangerous(WeatherCondition.Clear));
-        Assert.Equal(basePrice, PricingService.GetCurrentPrice(basePrice, WeatherCondition.Clear));
-        Assert.Equal(1m, PricingService.GetMultiplier(WeatherCondition.Clear));
+        // Act
+        bool isDangerous = PricingService.IsDangerous(WeatherCondition.Clear);
+        int price = PricingService.GetCurrentPrice(basePrice, WeatherCondition.Clear);
+        decimal multiplier = PricingService.GetMultiplier(WeatherCondition.Clear);
+
+        // Assert
+        Assert.False(isDangerous);
+        Assert.Equal(basePrice, price);
+        Assert.Equal(1m, multiplier);
     }
 }

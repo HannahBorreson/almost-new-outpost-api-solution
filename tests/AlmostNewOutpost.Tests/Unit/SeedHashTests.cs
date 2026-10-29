@@ -16,11 +16,14 @@ public class SeedHashTests
     [MemberData(nameof(SeededUsers))]
     public void SeededHash_VerifiesAgainstUsernamePlus123(string username)
     {
+        // Arrange
         string hash = FindSeededHash(username);
         PasswordHasher<UserRow> hasher = new PasswordHasher<UserRow>();
 
+        // Act
         PasswordVerificationResult result = hasher.VerifyHashedPassword(new UserRow(), hash, username + "123");
 
+        // Assert
         Assert.Equal(PasswordVerificationResult.Success, result);
     }
 

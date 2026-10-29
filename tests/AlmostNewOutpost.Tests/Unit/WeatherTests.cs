@@ -1,6 +1,9 @@
 using AlmostNewOutpost.Api.Options;
 using AlmostNewOutpost.Api.Weather;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
+using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace AlmostNewOutpost.Tests.Unit;
 
@@ -28,17 +31,28 @@ public class WeatherTests
     [Fact]
     public async Task SeededRandomProvider_IsRepeatable()
     {
-        List<WeatherCondition> first = await DrawAsync(CreateProvider(42), 200);
-        List<WeatherCondition> second = await DrawAsync(CreateProvider(42), 200);
+        // Arrange
+        RandomWeatherProvider firstProvider = CreateProvider(42);
+        RandomWeatherProvider secondProvider = CreateProvider(42);
 
+        // Act
+        List<WeatherCondition> first = await DrawAsync(firstProvider, 200);
+        List<WeatherCondition> second = await DrawAsync(secondProvider, 200);
+
+        // Assert
         Assert.Equal(first, second);
     }
 
     [Fact]
     public async Task RandomProvider_ProducesAllFourConditions_ClearMostOften()
     {
-        List<WeatherCondition> draws = await DrawAsync(CreateProvider(7), 2000);
+        // Arrange
+        RandomWeatherProvider provider = CreateProvider(7);
 
+        // Act
+        List<WeatherCondition> draws = await DrawAsync(provider, 2000);
+
+        // Assert
         foreach (WeatherCondition condition in Enum.GetValues<WeatherCondition>())
         {
             Assert.Contains(condition, draws);
@@ -51,14 +65,26 @@ public class WeatherTests
     [Fact]
     public void RandomProvider_ReportsItsSource()
     {
-        Assert.Equal("Random", CreateProvider(1).SourceName);
+        // Arrange
+        RandomWeatherProvider provider = CreateProvider(1);
+
+        // Act
+        string source = provider.SourceName;
+
+        // Assert
+        Assert.Equal("Random", source);
     }
 
     [Fact]
     public void NewState_IsClear_AndNotStale()
     {
-        WeatherSnapshot snapshot = new WeatherState().GetSnapshot();
+        // Arrange
+        WeatherState state = new WeatherState();
 
+        // Act
+        WeatherSnapshot snapshot = state.GetSnapshot();
+
+        // Assert
         Assert.Equal(WeatherCondition.Clear, snapshot.Condition);
         Assert.False(snapshot.IsStale);
         Assert.Null(snapshot.FetchedAtUtc);
@@ -67,15 +93,18 @@ public class WeatherTests
     [Fact]
     public void Override_BeatsTheProvider_UntilCleared()
     {
+        // Arrange
         WeatherState state = new WeatherState();
         DateTime now = new DateTime(2026, 10, 27, 21, 0, 0, DateTimeKind.Utc);
         state.RecordSuccess(WeatherCondition.Storm, "Random", now, now.AddMinutes(5));
 
+        // Act
         state.SetOverride(WeatherCondition.Clear);
         WeatherSnapshot overridden = state.GetSnapshot();
         state.ClearOverride();
         WeatherSnapshot cleared = state.GetSnapshot();
 
+        // Assert
         Assert.Equal(WeatherCondition.Clear, overridden.Condition);
         Assert.Equal("Override", overridden.Source);
         Assert.True(overridden.IsOverridden);
@@ -86,13 +115,19 @@ public class WeatherTests
     [Fact]
     public async Task RefreshService_StoresTheProvidersAnswer()
     {
-        FixedTimeProvider clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 27, 21, 0, 0, TimeSpan.Zero));
+        // Arrange
+        FakeTimeProvider clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 27, 21, 0, 0, TimeSpan.Zero));
         WeatherState state = new WeatherState();
-        WeatherRefreshService service = CreateRefreshService(new SequenceWeatherProvider(WeatherCondition.DustStorm), state, clock);
+        IWeatherProvider provider = Substitute.For<IWeatherProvider>();
+        provider.SourceName.Returns("Test");
+        provider.GetCurrentAsync(Arg.Any<CancellationToken>()).Returns(WeatherCondition.DustStorm);
+        WeatherRefreshService service = CreateRefreshService(provider, state, clock);
 
+        // Act
         await service.RefreshOnceAsync(CancellationToken.None);
         WeatherSnapshot snapshot = state.GetSnapshot();
 
+        // Assert
         Assert.Equal(WeatherCondition.DustStorm, snapshot.Condition);
         Assert.Equal(clock.GetUtcNow().UtcDateTime, snapshot.FetchedAtUtc);
         Assert.Equal(clock.GetUtcNow().UtcDateTime.AddMinutes(5), snapshot.NextRefreshUtc);
@@ -102,17 +137,24 @@ public class WeatherTests
     [Fact]
     public async Task RefreshService_WhenProviderFails_KeepsLastConditionAndMarksStale()
     {
-        FixedTimeProvider clock = new FixedTimeProvider(new DateTimeOffset(2026, 10, 27, 21, 0, 0, TimeSpan.Zero));
+        // Arrange
+        FakeTimeProvider clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 27, 21, 0, 0, TimeSpan.Zero));
         WeatherState state = new WeatherState();
-        SequenceWeatherProvider provider = new SequenceWeatherProvider(WeatherCondition.Storm);
+        IWeatherProvider provider = Substitute.For<IWeatherProvider>();
+        provider.SourceName.Returns("Test");
+        // The first call answers Storm. The second call fails because the weather service is down.
+        provider.GetCurrentAsync(Arg.Any<CancellationToken>()).Returns(
+            callInfo => Task.FromResult(WeatherCondition.Storm),
+            callInfo => throw new HttpRequestException("The weather service is down."));
         WeatherRefreshService service = CreateRefreshService(provider, state, clock);
-
         await service.RefreshOnceAsync(CancellationToken.None);
-        provider.FailNextCall = true;
         clock.Advance(TimeSpan.FromMinutes(5));
+
+        // Act
         await service.RefreshOnceAsync(CancellationToken.None);
         WeatherSnapshot snapshot = state.GetSnapshot();
 
+        // Assert
         Assert.Equal(WeatherCondition.Storm, snapshot.Condition);
         Assert.True(snapshot.IsStale);
         Assert.Equal(clock.GetUtcNow().UtcDateTime.AddMinutes(5), snapshot.NextRefreshUtc);
@@ -121,14 +163,21 @@ public class WeatherTests
     [Fact]
     public async Task RefreshService_WhenFirstFetchFails_StaysClear()
     {
-        FixedTimeProvider clock = new FixedTimeProvider(DateTimeOffset.UnixEpoch);
+        // Arrange
+        FakeTimeProvider clock = new FakeTimeProvider(DateTimeOffset.UnixEpoch);
         WeatherState state = new WeatherState();
-        SequenceWeatherProvider provider = new SequenceWeatherProvider(WeatherCondition.RadiationEvent) { FailNextCall = true };
+        IWeatherProvider provider = Substitute.For<IWeatherProvider>();
+        provider.SourceName.Returns("Test");
+        provider.GetCurrentAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new HttpRequestException("The weather service is down."));
+        WeatherRefreshService service = CreateRefreshService(provider, state, clock);
 
-        await CreateRefreshService(provider, state, clock).RefreshOnceAsync(CancellationToken.None);
+        // Act
+        await service.RefreshOnceAsync(CancellationToken.None);
+        WeatherSnapshot snapshot = state.GetSnapshot();
 
-        Assert.Equal(WeatherCondition.Clear, state.GetSnapshot().Condition);
-        Assert.True(state.GetSnapshot().IsStale);
+        // Assert
+        Assert.Equal(WeatherCondition.Clear, snapshot.Condition);
+        Assert.True(snapshot.IsStale);
     }
 
     private static WeatherRefreshService CreateRefreshService(IWeatherProvider provider, WeatherState state, TimeProvider clock)
