@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using AlmostNewOutpost.Api.Models.Entities;
 using AlmostNewOutpost.Api.Models.Responses;
 using AlmostNewOutpost.Tests.Api.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AlmostNewOutpost.Tests.Api;
 
@@ -15,6 +17,17 @@ public class AuthEndpointsTests : ApiTestBase
     public AuthEndpointsTests(ApiFixture fixture)
         : base(fixture)
     {
+    }
+
+    /// <summary>Archives a seeded user (a UTC time) or restores them (null), straight in the database.</summary>
+    private async Task SetArchivedAtUtcAsync(string username, DateTime? archivedAtUtc)
+    {
+        await WithDatabaseAsync(async db =>
+        {
+            User user = await db.Users.SingleAsync(u => u.Username == username);
+            user.ArchivedAtUtc = archivedAtUtc;
+            return await db.SaveChangesAsync();
+        });
     }
 
     [ApiTheory]
@@ -59,6 +72,33 @@ public class AuthEndpointsTests : ApiTestBase
     }
 
     [ApiFact]
+    public async Task Login_ArchivedUser_Returns401WithGenericMessage()
+    {
+        await SetArchivedAtUtcAsync("citizen", DateTime.UtcNow);
+
+        HttpResponseMessage response = await AnonymousClient().PostAsJsonAsync(
+            "/api/auth/login", new { username = "citizen", password = "citizen123" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        ProblemDetails problem = await ReadAsync<ProblemDetails>(response);
+        Assert.Equal("Invalid username or password.", problem.Title);
+    }
+
+    [ApiFact]
+    public async Task Login_RestoredUser_Succeeds()
+    {
+        await SetArchivedAtUtcAsync("citizen", DateTime.UtcNow);
+        await SetArchivedAtUtcAsync("citizen", null);
+
+        HttpResponseMessage response = await AnonymousClient().PostAsJsonAsync(
+            "/api/auth/login", new { username = "citizen", password = "citizen123" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        LoginResponse login = await ReadAsync<LoginResponse>(response);
+        Assert.Equal("citizen", login.User.Username);
+    }
+
+    [ApiFact]
     public async Task Login_BlankFields_Returns400WithFieldErrors()
     {
         HttpResponseMessage response = await AnonymousClient().PostAsJsonAsync(
@@ -91,6 +131,17 @@ public class AuthEndpointsTests : ApiTestBase
         Assert.Equal(3, user.Id);
         Assert.Equal("medic", user.Username);
         Assert.Equal("Medic", user.Role);
+    }
+
+    [ApiFact]
+    public async Task Me_ArchivedUser_Returns401()
+    {
+        HttpClient client = await ClientForAsync("citizen");
+        await SetArchivedAtUtcAsync("citizen", DateTime.UtcNow);
+
+        HttpResponseMessage response = await client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [ApiFact]

@@ -85,10 +85,11 @@ CREATE TABLE Roles (
 
 -- People who can log in. One role each.
 CREATE TABLE Users (
-    UserId        INT           NOT NULL AUTO_INCREMENT,
-    Username      VARCHAR(50)   NOT NULL,
-    PasswordHash  VARCHAR(255)  NOT NULL,
-    RoleId        INT           NOT NULL,
+    UserId         INT           NOT NULL AUTO_INCREMENT,
+    Username       VARCHAR(50)   NOT NULL,
+    PasswordHash   VARCHAR(255)  NOT NULL,
+    RoleId         INT           NOT NULL,
+    ArchivedAtUtc  DATETIME(6)   NULL,      -- NULL = active; a UTC date = archived, and when
     CONSTRAINT PK_Users PRIMARY KEY (UserId),
     CONSTRAINT UQ_Users_Username UNIQUE (Username),
     CONSTRAINT FK_Users_Roles FOREIGN KEY (RoleId)
@@ -165,6 +166,7 @@ DELIMITER $$
 -- ---------------------------------------------------------------------------
 
 -- Login lookup. Returns 0 or 1 row. The API verifies the password hash.
+-- Archived users are treated as if they don't exist, so they can't log in.
 CREATE PROCEDURE sp_GetUserByUsername (
     IN p_Username VARCHAR(50)
 )
@@ -172,10 +174,11 @@ BEGIN
     SELECT u.UserId, u.Username, u.PasswordHash, u.RoleId, r.RoleName
     FROM Users u
     INNER JOIN Roles r ON r.RoleId = u.RoleId
-    WHERE u.Username = TRIM(p_Username);
+    WHERE u.Username = TRIM(p_Username) AND u.ArchivedAtUtc IS NULL;
 END$$
 
 -- Used by GET /api/auth/me. Never returns the password hash.
+-- Archived users are treated as if they don't exist, so /me returns 401 for them.
 CREATE PROCEDURE sp_GetUserById (
     IN p_UserId INT
 )
@@ -183,7 +186,7 @@ BEGIN
     SELECT u.UserId, u.Username, u.RoleId, r.RoleName
     FROM Users u
     INNER JOIN Roles r ON r.RoleId = u.RoleId
-    WHERE u.UserId = p_UserId;
+    WHERE u.UserId = p_UserId AND u.ArchivedAtUtc IS NULL;
 END$$
 
 -- ---------------------------------------------------------------------------
