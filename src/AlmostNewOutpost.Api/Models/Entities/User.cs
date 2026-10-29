@@ -12,4 +12,7 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
 
     public int RoleId { get; set; }
+
+    /// <summary>Null means the user is active. A value means they were archived at that time (UTC).</summary>
+    public DateTime? ArchivedAtUtc { get; set; }
 }
